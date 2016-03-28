@@ -71,10 +71,10 @@ defmodule RethinkDB.Response do
   defp maybe_add_profile(resp, nil), do: resp
   defp maybe_add_profile({status, resp}, profile) do
     resp = case resp do
-      %RethinkDB.Feed{} = feed ->
+      %RethinkDB.Feed{} = struct ->
         %{feed | :profile => profile}
-      %RethinkDB.Response{} = response ->
-        %{response | :profile => profile}
+      %RethinkDB.Response{} = struct ->
+        %{struct | :profile => profile}
       _ ->
         %{data: resp, profile: profile}
     end
