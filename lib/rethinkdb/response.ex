@@ -47,20 +47,38 @@ defmodule RethinkDB.Response do
 
   def parse(raw_data, token, pid) do
     d = Poison.decode!(raw_data)
-    data = RethinkDB.Pseudotypes.convert_reql_pseudotypes(d["r"])
-    resp = case d["t"] do
-      1  -> %RethinkDB.Record{data: hd(data)}
-      2  -> %RethinkDB.Collection{data: data}
+    r = RethinkDB.Pseudotypes.convert_reql_pseudotypes(d["r"])
+    profile = d["p"]
+    type = d["t"]
+
+    resp = case type do
+      1  -> {:ok, hd(r)}
+      2  -> {:ok, r}
       3  -> case d["n"] do
-          [2] -> %RethinkDB.Feed{token: token, data: hd(data), pid: pid, note: d["n"]}
-           _  -> %RethinkDB.Feed{token: token, data: data, pid: pid, note: d["n"]}
+          [2] -> {:ok, %RethinkDB.Feed{token: token, data: hd(r), pid: pid, note: d["n"]}}
+           _  -> {:ok, %RethinkDB.Feed{token: token, data: r, pid: pid, note: d["n"]}}
         end
-      4  -> %RethinkDB.Response{token: token, data: d}
-      16  -> %RethinkDB.Response{token: token, data: d}
-      17  -> %RethinkDB.Response{token: token, data: d}
-      18  -> %RethinkDB.Response{token: token, data: d}
+      4 -> {:ok, :noreply}
+      5 -> {:ok, hd(r)}
+      16 -> {:error, r}
+      17 -> {:error, r}
+      18 -> {:error, r}
     end
-    %{resp | :profile => d["p"]}
+
+    maybe_add_profile(profile, resp)
+  end
+
+  defp maybe_add_profile(resp, nil), do: resp
+  defp maybe_add_profile({status, resp}, profile) do
+    resp = case resp do
+      %RethinkDB.Feed{} = feed ->
+        %{feed | :profile => profile}
+      %RethinkDB.Response{} = response ->
+        %{response | :profile => profile}
+      _ ->
+        %{data: resp, profile: profile}
+    end
+
+    {status, resp}
   end
 end
-
